@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "my-training-running-";
-const CACHE_NAME = `${CACHE_PREFIX}shell-v2`;
+const CACHE_NAME = `${CACHE_PREFIX}shell-v4`;
 const ASSET_PATHS = [
   "./",
   "./index.html",

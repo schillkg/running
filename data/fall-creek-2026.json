@@ -1,7 +1,7 @@
 {
   "format": "my-training-plan",
   "schemaVersion": 1,
-  "appVersion": "0.1.0",
+  "appVersion": "0.2.1",
   "createdAt": "2026-09-01T12:00:00-05:00",
   "goal": {
     "id": "fall-creek-50k-2026",

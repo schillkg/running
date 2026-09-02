@@ -4,11 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0f0f0f">
-    <meta name="description" content="A private, offline-first running training planner and workout log.">
+    <meta name="description" content="Stridebook is a private, offline-first running plan and workout log.">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="My Training">
-    <title>My Training</title>
+    <meta name="apple-mobile-web-app-title" content="Stridebook">
+    <title>Stridebook</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -23,9 +23,9 @@
       <header class="app-header">
         <div class="header-copy">
           <p class="eyebrow" id="header-eyebrow">Loading plan</p>
-          <h1 id="header-title">My Training</h1>
+          <h1 id="header-title">Stridebook</h1>
         </div>
-        <button class="icon-button" type="button" data-action="open-data" aria-label="Open data and backup settings">•••</button>
+        <button class="icon-button" type="button" data-action="open-data" aria-label="Open How it works">•••</button>
       </header>
 
       <main id="app-main" class="app-main" tabindex="-1">
@@ -52,11 +52,11 @@
       <div id="session-dialog-content"></div>
     </dialog>
 
-    <input id="import-file" type="file" accept="application/json,.json" hidden>
+    <input id="import-file" type="file" hidden>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
     <noscript>
-      <p class="noscript">My Training needs JavaScript to save workouts on this device.</p>
+      <p class="noscript">Stridebook needs JavaScript to save workouts on this device.</p>
     </noscript>
     <script type="module" src="./app.js"></script>
   </body>

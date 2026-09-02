@@ -1,6 +1,6 @@
 {
-  "name": "my-training",
-  "version": "0.1.0",
+  "name": "stridebook",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {

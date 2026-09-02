@@ -1,4 +1,4 @@
-# Publish and install My Training
+# Publish and install Stridebook
 
 You only need to use GitHub on your computer for publishing. You do not need to sign in to GitHub on your Android phone.
 
@@ -11,7 +11,7 @@ You only need to use GitHub on your computer for publishing. You do not need to 
 5. Choose **Create repository**. Do not add a README or template because this folder already contains those files.
 6. On the empty repository page, choose **uploading an existing file**. If files already exist there, use **Add file → Upload files** instead.
 7. Open the `run-training-app` folder on your computer, select its contents, and drag them onto the upload page. Confirm that `index.html` will appear at the top level—not inside another `run-training-app` folder. Do not upload `My_Training_Private_Backup.json`; it is outside this folder on purpose.
-8. Enter a message such as `Publish My Training` and choose **Commit changes**.
+8. Enter a message such as `Publish Stridebook` and choose **Commit changes**.
 9. Open **Settings → Pages** in the repository.
 10. Under **Build and deployment**, choose **Deploy from a branch**.
 11. Choose branch **main**, folder **/(root)**, then choose **Save**.
@@ -28,7 +28,7 @@ You need to be signed in to GitHub only while creating, uploading, or updating t
 3. Let it finish loading once.
 4. Tap Chrome's three-dot menu.
 5. Choose **Install app** or **Add to Home screen**.
-6. Confirm. My Training will appear with your other apps.
+6. Confirm. Stridebook will appear with your other apps.
 
 No GitHub login, APK file, Google Play account, or developer fee is needed on the phone.
 

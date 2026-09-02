@@ -9,6 +9,7 @@ test("manifest is GitHub Pages-safe and installable", async () => {
   assert.equal(manifest.start_url.startsWith("./"), true);
   assert.equal(manifest.scope, "./");
   assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.name, "Stridebook");
   assert.equal(manifest.icons.some((icon) => icon.sizes === "192x192"), true);
   assert.equal(manifest.icons.some((icon) => icon.sizes === "512x512"), true);
 });
@@ -36,4 +37,25 @@ test("service worker only cleans up caches owned by this app", async () => {
   const serviceWorker = await fs.readFile(new URL("sw.js", root), "utf8");
   assert.match(serviceWorker, /name\.startsWith\(CACHE_PREFIX\)/);
   assert.doesNotMatch(serviceWorker, /filter\(\(name\) => name !== CACHE_NAME\)/);
+});
+
+test("Android import is not restricted by a file-type filter", async () => {
+  const html = await fs.readFile(new URL("index.html", root), "utf8");
+  assert.match(html, /id="import-file" type="file" hidden/);
+  assert.doesNotMatch(html, /id="import-file"[^>]*accept=/);
+});
+
+test("locations use live directions without app-owned geolocation", async () => {
+  const app = await fs.readFile(new URL("app.js", root), "utf8");
+  assert.match(app, /google\.com\/maps\/dir\/\?api=1&destination=/);
+  assert.match(app, /Directions from me/);
+  assert.doesNotMatch(app, /navigator\.geolocation/);
+});
+
+test("strength is generic and supports custom routines", async () => {
+  const app = await fs.readFile(new URL("app.js", root), "utf8");
+  assert.match(app, /Strength \+ accessory work/);
+  assert.match(app, /id="custom-routine-form"/);
+  assert.match(app, /data-action="hide-routine"/);
+  assert.match(app, /data-action="show-routine"/);
 });

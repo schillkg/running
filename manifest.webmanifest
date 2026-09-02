@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "My Training",
-  "short_name": "Training",
-  "description": "A private, offline-first running training planner and workout log.",
+  "name": "Stridebook",
+  "short_name": "Stridebook",
+  "description": "A private, offline-first running plan and workout log.",
   "start_url": "./#/today",
   "scope": "./",
   "display": "standalone",

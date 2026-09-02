@@ -8,11 +8,14 @@ import {
   createDraftGoal,
   escapeHtml,
   importPlan,
+  isBackupDue,
   mergeSeedPlan,
+  normalizeState,
   summarizeGoal,
   toBackup,
   toWorkoutCsv,
   validateBackup,
+  visibleGoals,
 } from "../js/model.js";
 
 const seed = JSON.parse(await fs.readFile(new URL("../data/fall-creek-2026.json", import.meta.url), "utf8"));
@@ -25,6 +28,7 @@ test("Fall Creek seed contains the complete public plan and references", () => {
   assert.equal(state.locations.length, 10);
   assert.equal(state.sessions[0].date, "2026-08-31");
   assert.equal(state.sessions.at(-1).date, "2026-11-22");
+  assert.equal(state.preferences.onboardingComplete, false);
 });
 
 test("seeding again never duplicates plan data", () => {
@@ -79,6 +83,55 @@ test("draft goal can be replaced safely by its generated plan", () => {
   assert.equal(imported.activeGoalId, draft.id);
   assert.equal(imported.sessions.filter((session) => session.goalId === draft.id).length, 1);
   assert.equal(buildPlanRequest(imported, draft.id).goal.id, draft.id);
+});
+
+test("existing version 1 data skips first-run onboarding", () => {
+  const state = buildInitialState(seed);
+  state.preferences = { units: "miles" };
+  const migrated = normalizeState(state);
+  assert.equal(migrated.preferences.onboardingComplete, true);
+  assert.deepEqual(migrated.preferences.hiddenGoalIds, []);
+  assert.deepEqual(migrated.preferences.hiddenRoutineIds, []);
+});
+
+test("hidden goals stay stored but are excluded from active views", () => {
+  const state = buildInitialState(seed);
+  state.preferences.hiddenGoalIds = [seed.goal.id];
+  state.activeGoalId = seed.goal.id;
+  const normalized = normalizeState(state);
+  assert.equal(normalized.goals.length, 1);
+  assert.equal(visibleGoals(normalized).length, 0);
+  assert.equal(normalized.activeGoalId, null);
+});
+
+test("hidden strength routines remain stored and can be restored", () => {
+  const state = buildInitialState(seed);
+  const routineId = state.routines[0].id;
+  state.preferences.hiddenRoutineIds = [routineId];
+  const normalized = normalizeState(state);
+  assert.equal(normalized.routines.some((routine) => routine.id === routineId), true);
+  assert.deepEqual(normalized.preferences.hiddenRoutineIds, [routineId]);
+  normalized.preferences.hiddenRoutineIds = [];
+  assert.deepEqual(normalizeState(normalized).preferences.hiddenRoutineIds, []);
+});
+
+test("backup reminder waits for several changes or one unbacked week", () => {
+  const state = buildInitialState(seed);
+  state.preferences.changesSinceBackup = 2;
+  assert.equal(isBackupDue(state, new Date("2026-09-02T12:00:00Z")), false);
+  state.preferences.changesSinceBackup = 3;
+  assert.equal(isBackupDue(state, new Date("2026-09-02T12:00:00Z")), true);
+  state.preferences.changesSinceBackup = 1;
+  state.preferences.lastBackupAt = "2026-08-20T12:00:00Z";
+  assert.equal(isBackupDue(state, new Date("2026-09-02T12:00:00Z")), true);
+});
+
+test("new-goal request carries optional training context", () => {
+  const state = buildInitialState(seed);
+  const draft = createDraftGoal({ name: "First 5K", eventDate: "2027-04-24", distance: "5K", runDays: 3, planningNotes: "Runs twice a week." }, state.goals);
+  state.goals.push(draft);
+  state.activeGoalId = draft.id;
+  assert.equal(buildPlanRequest(state, draft.id).goal.planningNotes, "Runs twice a week.");
 });
 
 test("user-entered text is escaped before HTML rendering", () => {

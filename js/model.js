@@ -1,5 +1,5 @@
 export const SCHEMA_VERSION = 1;
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.2.1";
 export const BACKUP_FORMAT = "my-training-backup";
 export const PLAN_FORMAT = "my-training-plan";
 
@@ -57,7 +57,14 @@ export function buildInitialState(planPackage) {
     sessions: structuredClone(planPackage.sessions),
     routines: structuredClone(planPackage.routines ?? []),
     locations: structuredClone(planPackage.locations ?? []),
-    preferences: { units: "miles" },
+    preferences: {
+      units: "miles",
+      onboardingComplete: false,
+      hiddenGoalIds: [],
+      hiddenRoutineIds: [],
+      changesSinceBackup: 0,
+      lastBackupAt: null,
+    },
   };
   return normalizeState(state);
 }
@@ -118,15 +125,35 @@ export function normalizeState(input) {
   state.routines = Array.isArray(state.routines) ? state.routines : [];
   state.locations = Array.isArray(state.locations) ? state.locations : [];
   state.seededPlanVersions = Array.isArray(state.seededPlanVersions) ? state.seededPlanVersions : [];
-  state.preferences = state.preferences && typeof state.preferences === "object" ? state.preferences : { units: "miles" };
+  const preferences = state.preferences && typeof state.preferences === "object" ? state.preferences : {};
+  state.preferences = {
+    units: preferences.units === "kilometers" ? "kilometers" : "miles",
+    onboardingComplete: typeof preferences.onboardingComplete === "boolean" ? preferences.onboardingComplete : true,
+    hiddenGoalIds: Array.isArray(preferences.hiddenGoalIds)
+      ? [...new Set(preferences.hiddenGoalIds.filter((id) => typeof id === "string"))]
+      : [],
+    hiddenRoutineIds: Array.isArray(preferences.hiddenRoutineIds)
+      ? [...new Set(preferences.hiddenRoutineIds.filter((id) => typeof id === "string"))]
+      : [],
+    changesSinceBackup: Number.isSafeInteger(preferences.changesSinceBackup) && preferences.changesSinceBackup >= 0
+      ? Math.min(preferences.changesSinceBackup, 100_000)
+      : 0,
+    lastBackupAt: typeof preferences.lastBackupAt === "string" && Number.isFinite(Date.parse(preferences.lastBackupAt))
+      ? preferences.lastBackupAt
+      : null,
+  };
 
   const goalIds = new Set();
   for (const goal of state.goals) {
     if (!goal || typeof goal.id !== "string" || !goal.id) throw new Error("A goal is missing its identifier.");
     if (goalIds.has(goal.id)) throw new Error("The backup contains duplicate goals.");
     if (goal.eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(goal.eventDate)) throw new Error("A goal has an invalid event date.");
+    if (goal.planningNotes !== undefined && (typeof goal.planningNotes !== "string" || goal.planningNotes.length > 2000)) {
+      throw new Error("A goal has invalid planning notes.");
+    }
     goalIds.add(goal.id);
   }
+  state.preferences.hiddenGoalIds = state.preferences.hiddenGoalIds.filter((id) => goalIds.has(id));
 
   const sessionIds = new Set();
   for (const session of state.sessions) {
@@ -167,13 +194,17 @@ export function normalizeState(input) {
       }
     }
   }
+  state.preferences.hiddenRoutineIds = state.preferences.hiddenRoutineIds.filter((id) => routineIds.has(id));
 
-  if (!goalIds.has(state.activeGoalId)) state.activeGoalId = state.goals[0]?.id ?? null;
+  const hiddenGoalIds = new Set(state.preferences.hiddenGoalIds);
+  if (!goalIds.has(state.activeGoalId) || hiddenGoalIds.has(state.activeGoalId)) {
+    state.activeGoalId = state.goals.find((goal) => !hiddenGoalIds.has(goal.id))?.id ?? null;
+  }
   return state;
 }
 
 export function validatePlanPackage(input) {
-  if (!input || input.format !== PLAN_FORMAT) throw new Error("That file is not a My Training plan.");
+  if (!input || input.format !== PLAN_FORMAT) throw new Error("That file is not a Stridebook plan.");
   if (Number(input.schemaVersion) !== SCHEMA_VERSION) throw new Error("That plan uses an unsupported data version.");
   if (!input.goal || typeof input.goal.id !== "string" || !input.goal.id) throw new Error("The plan is missing its goal.");
   if (!Array.isArray(input.sessions)) throw new Error("The plan is missing its workouts.");
@@ -189,7 +220,7 @@ export function validatePlanPackage(input) {
 }
 
 export function validateBackup(input) {
-  if (!input || input.format !== BACKUP_FORMAT) throw new Error("That file is not a My Training backup.");
+  if (!input || input.format !== BACKUP_FORMAT) throw new Error("That file is not a Stridebook backup.");
   if (Number(input.schemaVersion) !== SCHEMA_VERSION) throw new Error("That backup uses an unsupported data version.");
   normalizeState(input.state);
   return true;
@@ -213,21 +244,28 @@ export function importPlan(state, planPackage) {
   next.routines = mergeById(next.routines, planPackage.routines ?? []);
   next.locations = mergeById(next.locations, planPackage.locations ?? []);
   next.activeGoalId = planPackage.goal.id;
+  next.preferences.hiddenGoalIds = next.preferences.hiddenGoalIds.filter((id) => id !== planPackage.goal.id);
   next.revision += 1;
   return normalizeState(next);
 }
 
-export function activeGoal(state) {
-  return state.goals.find((goal) => goal.id === state.activeGoalId) ?? state.goals[0] ?? null;
+export function visibleGoals(state) {
+  const hiddenGoalIds = new Set(state.preferences?.hiddenGoalIds ?? []);
+  return state.goals.filter((goal) => !hiddenGoalIds.has(goal.id));
 }
 
-export function sessionsForGoal(state, goalId = state.activeGoalId) {
+export function activeGoal(state) {
+  const visible = visibleGoals(state);
+  return visible.find((goal) => goal.id === state.activeGoalId) ?? visible[0] ?? null;
+}
+
+export function sessionsForGoal(state, goalId = activeGoal(state)?.id) {
   return state.sessions
     .filter((session) => session.goalId === goalId)
     .sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
 }
 
-export function summarizeGoal(state, goalId = state.activeGoalId) {
+export function summarizeGoal(state, goalId = activeGoal(state)?.id) {
   const sessions = sessionsForGoal(state, goalId);
   const completed = sessions.filter((session) => COMPLETE_STATUSES.has(session.status));
   const actualMinutes = completed.reduce((sum, session) => sum + numberOrZero(session.log?.actualMinutes), 0);
@@ -271,7 +309,7 @@ export function typeLabel(type) {
   return ({ easy: "Easy", quality: "Quality", long: "Long", race: "Race", recovery: "Recovery" })[type] ?? "Workout";
 }
 
-export function createDraftGoal({ name, eventDate, distance, runDays }, existingGoals) {
+export function createDraftGoal({ name, eventDate, distance, runDays, planningNotes }, existingGoals) {
   const title = String(name ?? "").trim();
   if (!title) throw new Error("Enter a goal or race name.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(eventDate ?? ""))) throw new Error("Choose an event date.");
@@ -292,6 +330,7 @@ export function createDraftGoal({ name, eventDate, distance, runDays }, existing
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago",
     status: "draft",
     preferredRunDays: Number(runDays) || 3,
+    planningNotes: String(planningNotes ?? "").trim().slice(0, 2000),
     primaryGoal: "Build a sensible plan from current training history",
     rules: [],
     sources: [],
@@ -302,8 +341,9 @@ export function buildPlanRequest(state, goalId) {
   const goal = state.goals.find((item) => item.id === goalId);
   if (!goal) throw new Error("Goal not found.");
   const selectedGoal = activeGoal(state);
+  const visible = visibleGoals(state);
   const currentGoal = selectedGoal?.id === goalId && goal.status === "draft"
-    ? state.goals.find((item) => item.id !== goalId && item.status !== "draft") ?? selectedGoal
+    ? visible.find((item) => item.id !== goalId && item.status !== "draft") ?? selectedGoal
     : selectedGoal;
   const history = summarizeGoal(state, currentGoal?.id);
   const recent = history.sessions
@@ -331,6 +371,15 @@ export function buildPlanRequest(state, goalId) {
       recent,
     },
   };
+}
+
+export function isBackupDue(state, now = new Date()) {
+  const changes = Number(state.preferences?.changesSinceBackup ?? 0);
+  if (changes >= 3) return true;
+  const lastBackupAt = state.preferences?.lastBackupAt;
+  if (!lastBackupAt || changes < 1) return false;
+  const elapsed = now.getTime() - new Date(lastBackupAt).getTime();
+  return Number.isFinite(elapsed) && elapsed >= 7 * 86400000;
 }
 
 export function toBackup(state) {
